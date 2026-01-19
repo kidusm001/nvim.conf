@@ -143,11 +143,20 @@ vim.o.timeoutlen = 300
 vim.o.splitright = true
 vim.o.splitbelow = true
 
--- Smart tab behavior (uses shiftwidth at start of line)
-vim.o.smarttab = true
+-- Global default indentation: 4 spaces (good for Python, etc.)
+-- JS/TS overrides this to 2 spaces via FileType autocmd below
+vim.o.expandtab = true -- Convert tabs to spaces
+vim.o.tabstop = 4 -- Insert 4 spaces for a tab
+vim.o.softtabstop = 4 -- Insert 4 spaces for a tab
+vim.o.shiftwidth = 4 -- The number of spaces inserted for each indentation
+vim.o.smartindent = true -- Insert indents automatically
 
--- NOTE: Indentation defaults are set per-filetype below
--- See the autocmd for javascript/typescript files
+-- Original commented settings preserved:
+-- vim.o.expandtab = true -- Convert tabs to spaces
+-- vim.o.tabstop = 4 -- Insert 4 spaces for a tab
+-- vim.o.softtabstop = 4 -- Insert 4 spaces for a tab
+-- vim.o.shiftwidth = 4 -- The number of spaces inserted for each indentation
+-- vim.o.smartindent = true -- Insert indents automatically
 
 -- Sets how neovim will display certain whitespace characters in the editor.
 --  See `:help 'list'`
@@ -233,19 +242,18 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   end,
 })
 
--- Set indentation for JavaScript/TypeScript files to 2 ACTUAL spaces (not tabs)
--- This ensures Biome uses 2-space indentation when no biome.json exists
+-- Set 2-space indentation for JS/TS/JSON files ONLY
+-- This allows manual typing with 2 spaces immediately (no need to reopen file)
+-- Other languages (Go, Python, etc.) are unaffected
 vim.api.nvim_create_autocmd('FileType', {
   desc = 'Set 2-space indentation for JS/TS files',
   group = vim.api.nvim_create_augroup('js-ts-indent', { clear = true }),
   pattern = { 'javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'json', 'jsonc' },
   callback = function()
-    -- These settings ensure 2 ACTUAL spaces, not tabs
-    vim.opt_local.expandtab = true     -- Convert tabs to spaces (CRITICAL for actual spaces)
-    vim.opt_local.tabstop = 2          -- Width of a tab character
-    vim.opt_local.softtabstop = 2      -- Number of spaces for tab key in insert mode
-    vim.opt_local.shiftwidth = 2       -- Number of spaces for indentation
-    -- Note: smarttab is a global option, not buffer-local, so we don't set it here
+    vim.opt_local.expandtab = true
+    vim.opt_local.tabstop = 2
+    vim.opt_local.softtabstop = 2
+    vim.opt_local.shiftwidth = 2
   end,
 })
 
@@ -830,6 +838,9 @@ require('lazy').setup({
         json = { 'biome', 'prettier', stop_after_first = true },
         css = { 'biome', 'prettier', stop_after_first = true },
         html = { 'biome', 'prettier', stop_after_first = true },
+
+        pyton = { 'ruff' },
+        go = { 'goimports', 'gofumpt' },
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
         --
@@ -837,10 +848,21 @@ require('lazy').setup({
         -- javascript = { "prettierd", "prettier", stop_after_first = true },
       },
       formatters = {
-        -- Biome formatter uses built-in logic:
-        -- - If biome.json exists: uses project config
-        -- - If no biome.json: uses vim buffer settings (expandtab, shiftwidth)
-        -- The global ~/.config/biome/biome.json is kept as reference documentation
+        biome = {
+          -- Force Biome to use 2 actual spaces (not tabs) when no biome.json exists
+          args = function(self, ctx)
+            -- Check if there's a local biome config
+            local has_local_config = vim.fs.find({ 'biome.json', 'biome.jsonc' }, { upward = true, path = ctx.filename })[1]
+
+            if has_local_config then
+              -- Project has its own config, use it
+              return { 'format', '--stdin-file-path', '$FILENAME' }
+            else
+              -- No project config: force 2 spaces (actual spaces, not tabs)
+              return { 'format', '--stdin-file-path', '$FILENAME', '--indent-style', 'space', '--indent-width', '2' }
+            end
+          end,
+        },
 
         prettier = {
           -- Only run prettier when prettier config exists (very recommended!)
