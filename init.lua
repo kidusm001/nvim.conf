@@ -143,6 +143,12 @@ vim.o.timeoutlen = 300
 vim.o.splitright = true
 vim.o.splitbelow = true
 
+-- Smart tab behavior (uses shiftwidth at start of line)
+vim.o.smarttab = true
+
+-- NOTE: Indentation defaults are set per-filetype below
+-- See the autocmd for javascript/typescript files
+
 -- Sets how neovim will display certain whitespace characters in the editor.
 --  See `:help 'list'`
 --  and `:help 'listchars'`
@@ -202,12 +208,16 @@ vim.keymap.set('n', '<C-h>', '<C-w><C-h>', { desc = 'Move focus to the left wind
 vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right window' })
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
+-- Movement Remaps
+vim.keymap.set('n', '<C-d>', '<C-d>zz', { desc = 'Scroll down and center cursor' })
+vim.keymap.set('n', '<C-u>', '<C-u>zz', { desc = 'Scroll up and center cursor' })
+vim.keymap.set('x', '<leader>p', [["_dP]], { desc = 'Paste over selection without losing register' })
 
 -- NOTE: Some terminals have colliding keymaps or are not able to send distinct keycodes
--- vim.keymap.set("n", "<C-S-h>", "<C-w>H", { desc = "Move window to the left" })
--- vim.keymap.set("n", "<C-S-l>", "<C-w>L", { desc = "Move window to the right" })
--- vim.keymap.set("n", "<C-S-j>", "<C-w>J", { desc = "Move window to the lower" })
--- vim.keymap.set("n", "<C-S-k>", "<C-w>K", { desc = "Move window to the upper" })
+vim.keymap.set('n', '<C-S-h>', '<C-w>H', { desc = 'Move window to the left' })
+vim.keymap.set('n', '<C-S-l>', '<C-w>L', { desc = 'Move window to the right' })
+vim.keymap.set('n', '<C-S-j>', '<C-w>J', { desc = 'Move window to the lower' })
+vim.keymap.set('n', '<C-S-k>', '<C-w>K', { desc = 'Move window to the upper' })
 
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
@@ -220,6 +230,22 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   group = vim.api.nvim_create_augroup('kickstart-highlight-yank', { clear = true }),
   callback = function()
     vim.hl.on_yank()
+  end,
+})
+
+-- Set indentation for JavaScript/TypeScript files to 2 ACTUAL spaces (not tabs)
+-- This ensures Biome uses 2-space indentation when no biome.json exists
+vim.api.nvim_create_autocmd('FileType', {
+  desc = 'Set 2-space indentation for JS/TS files',
+  group = vim.api.nvim_create_augroup('js-ts-indent', { clear = true }),
+  pattern = { 'javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'json', 'jsonc' },
+  callback = function()
+    -- These settings ensure 2 ACTUAL spaces, not tabs
+    vim.opt_local.expandtab = true     -- Convert tabs to spaces (CRITICAL for actual spaces)
+    vim.opt_local.tabstop = 2          -- Width of a tab character
+    vim.opt_local.softtabstop = 2      -- Number of spaces for tab key in insert mode
+    vim.opt_local.shiftwidth = 2       -- Number of spaces for indentation
+    -- Note: smarttab is a global option, not buffer-local, so we don't set it here
   end,
 })
 
@@ -251,7 +277,32 @@ rtp:prepend(lazypath)
 -- NOTE: Here is where you install your plugins.
 require('lazy').setup({
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
-  'NMAC427/guess-indent.nvim', -- Detect tabstop and shiftwidth automatically
+  {
+    'NMAC427/guess-indent.nvim',
+    opts = {
+      auto_cmd = true, -- Set to false to disable automatic execution
+      override_editorconfig = false, -- Set to true to override settings set by .editorconfig
+      filetype_exclude = { -- A list of filetypes for which the auto command gets disabled
+        'netrw',
+        'tutor',
+      },
+      buftype_exclude = { -- A list of buffer types for which the auto command gets disabled
+        'help',
+        'nofile',
+        'terminal',
+        'prompt',
+      },
+      on_tab_options = { -- A table of vim options when tabs are detected
+        ['expandtab'] = false,
+      },
+      on_space_options = { -- A table of vim options when spaces are detected
+        ['expandtab'] = true,
+        ['tabstop'] = 'detected', -- If the option value is 'detected', The value is set to the automatically detected indent size.
+        ['softtabstop'] = 'detected',
+        ['shiftwidth'] = 'detected',
+      },
+    },
+  }, -- Detect tabstop and shiftwidth automatically
 
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
@@ -772,11 +823,39 @@ require('lazy').setup({
       end,
       formatters_by_ft = {
         lua = { 'stylua' },
+        javascript = { 'biome', 'prettier', stop_after_first = true },
+        typescript = { 'biome', 'prettier', stop_after_first = true },
+        javascriptreact = { 'biome', 'prettier', stop_after_first = true },
+        typescriptreact = { 'biome', 'prettier', stop_after_first = true },
+        json = { 'biome', 'prettier', stop_after_first = true },
+        css = { 'biome', 'prettier', stop_after_first = true },
+        html = { 'biome', 'prettier', stop_after_first = true },
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
         -- javascript = { "prettierd", "prettier", stop_after_first = true },
+      },
+      formatters = {
+        -- Biome formatter uses built-in logic:
+        -- - If biome.json exists: uses project config
+        -- - If no biome.json: uses vim buffer settings (expandtab, shiftwidth)
+        -- The global ~/.config/biome/biome.json is kept as reference documentation
+
+        prettier = {
+          -- Only run prettier when prettier config exists (very recommended!)
+          require_cwd = true,
+          -- or explicit condition
+          condition = function(ctx)
+            return vim.fs.find({
+              '.prettierrc',
+              '.prettierrc.json',
+              '.prettierrc.js',
+              'prettier.config.js',
+              -- you can add more...
+            }, { upward = true, path = ctx.filename })[1]
+          end,
+        },
       },
     },
   },
@@ -893,6 +972,7 @@ require('lazy').setup({
         styles = {
           comments = { italic = false }, -- Disable italics in comments
         },
+        transparent = true,
       }
 
       -- Load the colorscheme here.
@@ -980,7 +1060,7 @@ require('lazy').setup({
   -- require 'kickstart.plugins.debug',
   require 'kickstart.plugins.indent_line',
   -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
+  require 'kickstart.plugins.autopairs',
   -- require 'kickstart.plugins.neo-tree',
   require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
