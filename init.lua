@@ -838,6 +838,7 @@ require('lazy').setup({
         json = { 'biome', 'prettier', stop_after_first = true },
         css = { 'biome', 'prettier', stop_after_first = true },
         html = { 'biome', 'prettier', stop_after_first = true },
+        markdown = { 'prettier' },
 
         pyton = { 'ruff' },
         go = { 'goimports', 'gofumpt' },
