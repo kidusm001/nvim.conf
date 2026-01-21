@@ -649,7 +649,6 @@ require('lazy').setup({
       local servers = {
         -- clangd = {},
         -- gopls = {},
-        -- pyright = {},
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -659,6 +658,23 @@ require('lazy').setup({
         -- But for many setups, the LSP (`ts_ls`) will work just fine
         -- ts_ls = {},
         --
+
+        -- Python LSP with virtual environment auto-detection
+        pyright = {
+          settings = {
+            python = {
+              analysis = {
+                -- Auto-detect virtual environments (.venv, venv, etc.)
+                autoSearchPaths = true,
+                useLibraryCodeForTypes = true,
+                diagnosticMode = 'openFilesOnly', -- or 'workspace' for project-wide
+                -- Type checking mode: 'off', 'basic', 'strict'
+                -- Set to 'off' to configure later as requested
+                typeCheckingMode = 'off',
+              },
+            },
+          },
+        },
 
         lua_ls = {
           -- cmd = { ... },
@@ -692,6 +708,7 @@ require('lazy').setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
+        'debugpy', -- Python debugger adapter
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
@@ -1055,6 +1072,7 @@ require('lazy').setup({
         'go',
         'javascript',
         'typescript',
+        'python',
       },
       -- Autoinstall languages that are not installed
       auto_install = true,
@@ -1084,9 +1102,9 @@ require('lazy').setup({
   --  Here are some example plugins that I've included in the Kickstart repository.
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
-  -- require 'kickstart.plugins.debug',
+  require 'kickstart.plugins.debug',
+  require 'kickstart.plugins.lint', -- Python linting with Ruff
   require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
   require 'kickstart.plugins.autopairs',
   -- require 'kickstart.plugins.neo-tree',
   require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps

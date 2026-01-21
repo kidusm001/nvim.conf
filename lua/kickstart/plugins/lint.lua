@@ -7,6 +7,7 @@ return {
       local lint = require 'lint'
       lint.linters_by_ft = {
         markdown = { 'markdownlint' },
+        python = { 'ruff' }, -- Ruff for fast Python linting (style, errors, imports)
       }
 
       -- To allow other plugins to add linters to require('lint').linters_by_ft,
