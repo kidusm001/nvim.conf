@@ -9,6 +9,13 @@ return {
     opts = {}, -- your configuration here
   },
 
+  -- Seamless navigation between Neovim splits and tmux panes
+  -- Works with tmux plugin 'christoomey/vim-tmux-navigator' (already configured in tmux.conf)
+  {
+    'christoomey/vim-tmux-navigator',
+    lazy = false, -- Load immediately for seamless navigation
+  },
+
   -- File explorer: Edit your filesystem like a buffer
   -- NOTE: oil.nvim commented out to try mini.files
   -- Uncomment below to use oil.nvim instead of mini.files
